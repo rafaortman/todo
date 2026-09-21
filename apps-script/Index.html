@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>ToDo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <section class="auth-view" id="auth-view" hidden aria-labelledby="auth-title">
+    <form class="auth-card" id="auth-form">
+      <span class="auth-brand">ToDo</span>
+      <h1 id="auth-title">Entrar</h1>
+      <p>Use a senha definida para este painel.</p>
+      <label for="auth-password">Senha</label>
+      <input id="auth-password" type="password" required autocomplete="current-password">
+      <button class="primary-button" id="auth-submit" type="submit">Continuar</button>
+      <span class="form-message" id="auth-message" aria-live="polite"></span>
+    </form>
+  </section>
+
+  <div class="app" id="app">
+    <header class="app-header">
+      <button class="brand" id="home-button" type="button" aria-label="Voltar para tarefas">ToDo</button>
+      <div class="header-actions">
+        <span class="connection-state" id="connection-state" hidden aria-live="polite"></span>
+        <button class="icon-button" id="theme-toggle" type="button" aria-label="Alternar tema" data-tooltip="Claro / escuro">
+          <i data-lucide="moon" aria-hidden="true"></i>
+        </button>
+        <button class="icon-button" id="logout-button" type="button" aria-label="Sair" data-tooltip="Sair" hidden>
+          <i data-lucide="log-out" aria-hidden="true"></i>
+        </button>
+        <button class="icon-button icon-button--primary" id="new-task" type="button" aria-label="Nova tarefa" data-tooltip="Nova tarefa">
+          <i data-lucide="plus" aria-hidden="true"></i>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <section class="view overview-view" id="overview-view" aria-labelledby="overview-title">
+        <h1 class="sr-only" id="overview-title">Tarefas</h1>
+
+        <div class="toolbar">
+          <div class="search-control" id="search-control">
+            <button class="icon-button icon-button--plain" id="search-toggle" type="button" aria-label="Buscar" data-tooltip="Buscar">
+              <i data-lucide="search" aria-hidden="true"></i>
+            </button>
+            <input id="search-input" type="search" aria-label="Buscar tarefas" placeholder="Buscar tarefas">
+          </div>
+
+          <div class="toolbar-actions">
+            <div class="menu-wrap">
+              <button class="icon-button" id="filter-toggle" type="button" aria-label="Filtrar" aria-expanded="false" data-tooltip="Filtrar">
+                <i data-lucide="list-filter" aria-hidden="true"></i>
+              </button>
+              <div class="control-menu" id="filter-menu" hidden>
+                <label>Status
+                  <select id="filter-status">
+                    <option value="">Todos</option>
+                    <option>Fazer</option>
+                    <option>Em andamento</option>
+                    <option>Aguardando</option>
+                    <option>Stand-by</option>
+                  </select>
+                </label>
+                <label>Prioridade
+                  <select id="filter-priority">
+                    <option value="">Todas</option>
+                    <option>Alta</option>
+                    <option>Média</option>
+                    <option>Baixa</option>
+                  </select>
+                </label>
+                <label>Etiqueta ou interlocutor
+                  <input id="filter-text" type="text" placeholder="Digite para filtrar">
+                </label>
+                <button class="text-button" id="clear-filters" type="button">Limpar filtros</button>
+              </div>
+            </div>
+
+            <div class="menu-wrap">
+              <button class="icon-button" id="sort-toggle" type="button" aria-label="Ordenar" aria-expanded="false" data-tooltip="Ordenar">
+                <i data-lucide="arrow-up-down" aria-hidden="true"></i>
+              </button>
+              <div class="control-menu control-menu--compact" id="sort-menu" hidden>
+                <label class="radio-row"><input type="radio" name="sort" value="manual" checked> Ordem manual</label>
+                <label class="radio-row"><input type="radio" name="sort" value="priority"> Prioridade</label>
+                <label class="radio-row"><input type="radio" name="sort" value="schedule"> Próximo compromisso</label>
+                <label class="radio-row"><input type="radio" name="sort" value="updated"> Atualização recente</label>
+              </div>
+            </div>
+
+            <button class="icon-button count-button" id="completed-toggle" type="button" aria-label="Mostrar concluídas" aria-pressed="false" data-tooltip="Concluídas">
+              <i data-lucide="archive" aria-hidden="true"></i>
+              <span id="completed-count">0</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="list-heading">
+          <h2 id="list-title">Tarefas ativas</h2>
+          <span id="task-count">0 tarefas</span>
+        </div>
+
+        <section class="task-grid" id="task-grid" aria-live="polite"></section>
+        <div class="empty-state" id="empty-state" hidden>
+          <i data-lucide="inbox" aria-hidden="true"></i>
+          <p>Nenhuma tarefa encontrada.</p>
+        </div>
+      </section>
+
+      <section class="view task-view" id="task-view" hidden aria-labelledby="task-screen-title">
+        <div class="task-view-header">
+          <button class="icon-button icon-button--plain" id="back-button" type="button" aria-label="Voltar" data-tooltip="Voltar">
+            <i data-lucide="arrow-left" aria-hidden="true"></i>
+          </button>
+          <div class="task-view-actions">
+            <span class="save-state" id="save-state" aria-live="polite"></span>
+            <button class="icon-button" id="complete-task" type="button" aria-label="Concluir tarefa" data-tooltip="Concluir">
+              <i data-lucide="circle-check" aria-hidden="true"></i>
+            </button>
+            <button class="icon-button icon-button--primary" id="save-task" type="button" aria-label="Salvar tarefa" data-tooltip="Salvar">
+              <i data-lucide="save" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+
+        <form class="task-form" id="task-form">
+          <input id="task-id" type="hidden">
+
+          <section class="ai-create" id="ai-create">
+            <label for="ai-prompt">Criar com IA</label>
+            <div class="ai-row">
+              <textarea id="ai-prompt" rows="2" placeholder="Ex.: segunda às 16h, verificar com o PayPal a análise dos documentos da LANDR"></textarea>
+              <button class="icon-button" id="ai-submit" type="button" aria-label="Interpretar descrição" data-tooltip="Interpretar com IA">
+                <i data-lucide="sparkles" aria-hidden="true"></i>
+              </button>
+            </div>
+            <p id="ai-help">Descreva a tarefa em linguagem natural e revise os campos antes de salvar.</p>
+          </section>
+
+          <label class="field field--title">Tarefa
+            <input id="task-title" type="text" required autocomplete="off">
+          </label>
+
+          <label class="field">Próxima ação
+            <textarea id="task-next-action" rows="2"></textarea>
+          </label>
+
+          <div class="field-row">
+            <label class="field">Status
+              <select id="task-status">
+                <option>Fazer</option>
+                <option>Em andamento</option>
+                <option>Aguardando</option>
+                <option>Stand-by</option>
+                <option>Concluído</option>
+              </select>
+            </label>
+            <label class="field">Prioridade
+              <select id="task-priority">
+                <option>Alta</option>
+                <option selected>Média</option>
+                <option>Baixa</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="field-row">
+            <label class="field">Agendamento
+              <input id="task-schedule" type="datetime-local">
+            </label>
+            <label class="field">Prazo
+              <input id="task-deadline" type="date">
+            </label>
+          </div>
+
+          <label class="field">Link da tarefa <span>opcional</span>
+            <div class="input-action">
+              <input id="task-link" type="url" placeholder="https://">
+              <button class="icon-button" id="open-link" type="button" aria-label="Abrir link" data-tooltip="Abrir link" disabled>
+                <i data-lucide="external-link" aria-hidden="true"></i>
+              </button>
+            </div>
+          </label>
+
+          <label class="field">Pendência
+            <textarea id="task-dependency" rows="2"></textarea>
+          </label>
+
+          <label class="field">Etiquetas
+            <input id="task-tags" type="text" placeholder="Separe por vírgulas">
+          </label>
+
+          <fieldset class="color-field">
+            <legend>Cor do card</legend>
+            <div class="color-options" id="color-options">
+              <label><input type="radio" name="color" value="neutral" checked><span class="swatch swatch--neutral" aria-label="Neutro"></span></label>
+              <label><input type="radio" name="color" value="blue"><span class="swatch swatch--blue" aria-label="Azul"></span></label>
+              <label><input type="radio" name="color" value="sand"><span class="swatch swatch--sand" aria-label="Areia"></span></label>
+              <label><input type="radio" name="color" value="green"><span class="swatch swatch--green" aria-label="Verde"></span></label>
+              <label><input type="radio" name="color" value="lavender"><span class="swatch swatch--lavender" aria-label="Lilás"></span></label>
+            </div>
+          </fieldset>
+
+          <section class="contacts-section">
+            <div class="section-heading">
+              <div>
+                <span>Interlocutores</span>
+                <h2>Pessoas relacionadas</h2>
+              </div>
+              <button class="icon-button" id="add-contact" type="button" aria-label="Adicionar interlocutor" data-tooltip="Adicionar interlocutor">
+                <i data-lucide="user-plus" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div class="contacts-list" id="contacts-list"></div>
+          </section>
+
+          <button class="delete-button" id="delete-task" type="button">
+            <i data-lucide="trash-2" aria-hidden="true"></i>
+            Excluir tarefa
+          </button>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <template id="contact-template">
+    <fieldset class="contact-editor">
+      <div class="contact-grid">
+        <label>Nome<input data-contact="name" type="text"></label>
+        <label>E-mail<input data-contact="email" type="email"></label>
+        <label>Telefone<input data-contact="phone" type="tel"></label>
+        <label>WhatsApp<input data-contact="whatsapp" type="tel"></label>
+      </div>
+      <button class="icon-button icon-button--plain remove-contact" type="button" aria-label="Remover interlocutor" data-tooltip="Remover">
+        <i data-lucide="x" aria-hidden="true"></i>
+      </button>
+    </fieldset>
+  </template>
+
+  <div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <?!= include('App'); ?>
+</body>
+</html>
