@@ -1,5 +1,7 @@
 const STORAGE_KEY = 'todo-beta-tasks';
 const THEME_KEY = 'todo-beta-theme';
+const SESSION_KEY = 'todo-beta-session';
+const REMOTE_MODE = Boolean(window.google?.script?.run);
 
 const sampleTasks = [
   {
@@ -15,6 +17,7 @@ const sampleTasks = [
     tags: ['produto', 'organização'],
     color: 'blue',
     contacts: [],
+    order: 0,
     createdAt: Date.now(),
     updatedAt: Date.now(),
     completedAt: null
@@ -32,6 +35,7 @@ const sampleTasks = [
     tags: ['pessoal'],
     color: 'sand',
     contacts: [{ name: 'Interlocutor', email: '', phone: '', whatsapp: '' }],
+    order: 1,
     createdAt: Date.now() - 1000,
     updatedAt: Date.now() - 1000,
     completedAt: null
@@ -39,10 +43,12 @@ const sampleTasks = [
 ];
 
 const state = {
-  tasks: loadTasks(),
+  tasks: REMOTE_MODE ? [] : loadTasks(),
   editingId: null,
   showCompleted: false,
-  sort: 'manual'
+  sort: 'manual',
+  token: REMOTE_MODE ? sessionStorage.getItem(SESSION_KEY) || '' : '',
+  busy: false
 };
 
 const el = id => document.getElementById(id);
@@ -57,18 +63,32 @@ function loadTasks() {
 }
 
 function saveTasks() {
+  if (REMOTE_MODE) return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));
 }
 
-function init() {
+async function init() {
   setTheme(localStorage.getItem(THEME_KEY) || 'light');
   bindEvents();
-  renderTasks();
+  el('logout-button').hidden = !REMOTE_MODE;
+  if (REMOTE_MODE) {
+    el('app').hidden = true;
+    el('connection-state').hidden = false;
+    if (state.token) await loadRemoteTasks();
+    else showLogin();
+  } else {
+    el('auth-view').hidden = true;
+    el('ai-submit').disabled = true;
+    el('ai-help').textContent = 'A criação por IA estará disponível na versão privada do Apps Script.';
+    renderTasks();
+  }
   lucide.createIcons({ attrs: { width: 17, height: 17, 'stroke-width': 1.8 } });
 }
 
 function bindEvents() {
   el('theme-toggle').addEventListener('click', toggleTheme);
+  el('logout-button').addEventListener('click', handleLogout);
+  el('auth-form').addEventListener('submit', handleLogin);
   el('new-task').addEventListener('click', () => openTask());
   el('home-button').addEventListener('click', showOverview);
   el('back-button').addEventListener('click', showOverview);
@@ -93,6 +113,7 @@ function bindEvents() {
   el('add-contact').addEventListener('click', () => addContactEditor());
   el('task-link').addEventListener('input', updateLinkButton);
   el('open-link').addEventListener('click', openTaskLink);
+  el('ai-submit').addEventListener('click', createWithAi);
   form.addEventListener('input', () => { el('save-state').textContent = 'Alterações não salvas'; });
 
   document.addEventListener('click', event => {
@@ -210,7 +231,8 @@ function showOverview() {
 function emptyTask() {
   return {
     id: '', title: '', nextAction: '', status: 'Fazer', priority: 'Média', schedule: '', deadline: '',
-    link: '', dependency: '', tags: [], color: 'neutral', contacts: [], createdAt: Date.now(), updatedAt: Date.now(), completedAt: null
+    link: '', dependency: '', tags: [], color: 'neutral', contacts: [], order: state.tasks.length,
+    createdAt: Date.now(), updatedAt: Date.now(), completedAt: null
   };
 }
 
@@ -224,14 +246,14 @@ function fillForm(task) {
   el('task-deadline').value = task.deadline;
   el('task-link').value = task.link;
   el('task-dependency').value = task.dependency;
-  el('task-tags').value = task.tags.join(', ');
+  el('task-tags').value = (task.tags || []).join(', ');
   form.querySelector(`input[name="color"][value="${task.color || 'neutral'}"]`).checked = true;
   el('contacts-list').replaceChildren();
-  task.contacts.forEach(addContactEditor);
+  (task.contacts || []).forEach(addContactEditor);
   updateLinkButton();
 }
 
-function saveTaskFromForm() {
+async function saveTaskFromForm() {
   if (!form.reportValidity()) return;
   const existing = state.tasks.find(task => task.id === state.editingId);
   const task = {
@@ -247,28 +269,46 @@ function saveTaskFromForm() {
     tags: el('task-tags').value.split(',').map(item => item.trim()).filter(Boolean),
     color: form.querySelector('input[name="color"]:checked').value,
     contacts: readContacts(),
+    order: existing?.order ?? state.tasks.length,
     createdAt: existing?.createdAt || Date.now(),
     updatedAt: Date.now(),
     completedAt: el('task-status').value === 'Concluído' ? (existing?.completedAt || Date.now()) : null
   };
 
-  if (existing) Object.assign(existing, task);
-  else state.tasks.unshift(task);
-  saveTasks();
-  state.editingId = task.id;
-  el('save-state').textContent = 'Salvo agora';
-  setTimeout(showOverview, 250);
+  setBusy(true, 'Salvando…');
+  try {
+    if (REMOTE_MODE) {
+      const result = await callServer('saveTask', state.token, task);
+      if (existing) Object.assign(existing, result.task);
+      else state.tasks.push(result.task);
+      state.editingId = result.task.id;
+      if (result.calendarWarning) notify(result.calendarWarning);
+    } else {
+      if (existing) Object.assign(existing, task);
+      else state.tasks.unshift(task);
+      saveTasks();
+      state.editingId = task.id;
+    }
+    el('save-state').textContent = 'Salvo agora';
+    setTimeout(showOverview, 250);
+  } catch (error) {
+    handleRemoteError(error);
+    el('save-state').textContent = 'Não foi possível salvar';
+  } finally {
+    setBusy(false);
+  }
 }
 
-function completeCurrentTask() {
+async function completeCurrentTask() {
   if (!state.editingId) return;
-  toggleTaskComplete(state.editingId);
+  await toggleTaskComplete(state.editingId);
   showOverview();
 }
 
-function toggleTaskComplete(id) {
+async function toggleTaskComplete(id) {
   const task = state.tasks.find(item => item.id === id);
   if (!task) return;
+  const previous = { status: task.status, completedAt: task.completedAt, updatedAt: task.updatedAt };
   if (task.completedAt) {
     task.completedAt = null;
     task.status = 'Fazer';
@@ -277,15 +317,29 @@ function toggleTaskComplete(id) {
     task.status = 'Concluído';
   }
   task.updatedAt = Date.now();
-  saveTasks();
-  renderTasks();
+  try {
+    if (REMOTE_MODE) {
+      const result = await callServer('saveTask', state.token, task);
+      Object.assign(task, result.task);
+      if (result.calendarWarning) notify(result.calendarWarning);
+    } else saveTasks();
+    renderTasks();
+  } catch (error) {
+    Object.assign(task, previous);
+    handleRemoteError(error);
+  }
 }
 
-function deleteCurrentTask() {
+async function deleteCurrentTask() {
   if (!state.editingId || !confirm('Excluir esta tarefa?')) return;
-  state.tasks = state.tasks.filter(task => task.id !== state.editingId);
-  saveTasks();
-  showOverview();
+  try {
+    if (REMOTE_MODE) await callServer('deleteTask', state.token, state.editingId);
+    state.tasks = state.tasks.filter(task => task.id !== state.editingId);
+    saveTasks();
+    showOverview();
+  } catch (error) {
+    handleRemoteError(error);
+  }
 }
 
 function addContactEditor(contact = { name: '', email: '', phone: '', whatsapp: '' }) {
@@ -380,7 +434,11 @@ function enableDragAndDrop() {
       const reordered = visibleIds.map(id => state.tasks.find(task => task.id === id));
       const hidden = state.tasks.filter(task => !visibleSet.has(task.id));
       state.tasks = [...reordered, ...hidden];
+      state.tasks.forEach((task, index) => { task.order = index; });
       saveTasks();
+      if (REMOTE_MODE) {
+        callServer('reorderTasks', state.token, state.tasks.map(task => task.id)).catch(handleRemoteError);
+      }
     });
   });
 
@@ -395,6 +453,110 @@ function enableDragAndDrop() {
     if (target) grid.insertBefore(dragging, target);
     else grid.append(dragging);
   });
+}
+
+async function handleLogin(event) {
+  event.preventDefault();
+  const password = el('auth-password').value;
+  el('auth-submit').disabled = true;
+  el('auth-message').textContent = '';
+  try {
+    const result = await callServer('login', password);
+    state.token = result.token;
+    sessionStorage.setItem(SESSION_KEY, state.token);
+    el('auth-password').value = '';
+    await loadRemoteTasks();
+  } catch (error) {
+    el('auth-message').textContent = error.message || 'Não foi possível entrar.';
+  } finally {
+    el('auth-submit').disabled = false;
+  }
+}
+
+async function handleLogout() {
+  const token = state.token;
+  state.token = '';
+  sessionStorage.removeItem(SESSION_KEY);
+  state.tasks = [];
+  showLogin();
+  if (token) callServer('logout', token).catch(() => {});
+}
+
+async function loadRemoteTasks() {
+  el('connection-state').textContent = 'Carregando…';
+  try {
+    state.tasks = await callServer('listTasks', state.token);
+    el('auth-view').hidden = true;
+    el('app').hidden = false;
+    el('connection-state').textContent = '';
+    renderTasks();
+  } catch (error) {
+    handleRemoteError(error);
+  }
+}
+
+function showLogin() {
+  el('app').hidden = true;
+  el('auth-view').hidden = false;
+  el('auth-message').textContent = '';
+  setTimeout(() => el('auth-password').focus(), 0);
+}
+
+async function createWithAi() {
+  if (!REMOTE_MODE) return;
+  const prompt = el('ai-prompt').value.trim();
+  if (!prompt) {
+    el('ai-prompt').focus();
+    return;
+  }
+
+  el('ai-submit').disabled = true;
+  el('ai-help').textContent = 'Interpretando…';
+  try {
+    const generated = await callServer('createTaskFromPrompt', state.token, prompt);
+    fillForm({ ...emptyTask(), ...generated, id: '' });
+    el('ai-prompt').value = prompt;
+    el('ai-help').textContent = 'Campos preenchidos. Revise antes de salvar.';
+  } catch (error) {
+    handleRemoteError(error);
+    el('ai-help').textContent = 'Não foi possível interpretar. Tente reformular a descrição.';
+  } finally {
+    el('ai-submit').disabled = false;
+  }
+}
+
+function callServer(method, ...args) {
+  if (!REMOTE_MODE) return Promise.reject(new Error('Backend indisponível nesta versão.'));
+  return new Promise((resolve, reject) => {
+    const runner = google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(error => reject(new Error(error?.message || String(error))));
+    runner[method](...args);
+  });
+}
+
+function handleRemoteError(error) {
+  const message = error?.message || 'Ocorreu um erro inesperado.';
+  if (/sessão expirou/i.test(message)) {
+    state.token = '';
+    sessionStorage.removeItem(SESSION_KEY);
+    showLogin();
+  }
+  notify(message);
+}
+
+function setBusy(busy, message = '') {
+  state.busy = busy;
+  el('save-task').disabled = busy;
+  if (message) el('save-state').textContent = message;
+}
+
+function notify(message) {
+  const toast = el('toast');
+  toast.textContent = message;
+  toast.hidden = false;
+  clearTimeout(notify.timer);
+  notify.timer = setTimeout(() => { toast.hidden = true; }, 5000);
 }
 
 function dateValue(value) {

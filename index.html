@@ -11,12 +11,28 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <section class="auth-view" id="auth-view" hidden aria-labelledby="auth-title">
+    <form class="auth-card" id="auth-form">
+      <span class="auth-brand">ToDo</span>
+      <h1 id="auth-title">Entrar</h1>
+      <p>Use a senha definida para este painel.</p>
+      <label for="auth-password">Senha</label>
+      <input id="auth-password" type="password" required autocomplete="current-password">
+      <button class="primary-button" id="auth-submit" type="submit">Continuar</button>
+      <span class="form-message" id="auth-message" aria-live="polite"></span>
+    </form>
+  </section>
+
   <div class="app" id="app">
     <header class="app-header">
       <button class="brand" id="home-button" type="button" aria-label="Voltar para tarefas">ToDo</button>
       <div class="header-actions">
+        <span class="connection-state" id="connection-state" hidden aria-live="polite"></span>
         <button class="icon-button" id="theme-toggle" type="button" aria-label="Alternar tema" data-tooltip="Claro / escuro">
           <i data-lucide="moon" aria-hidden="true"></i>
+        </button>
+        <button class="icon-button" id="logout-button" type="button" aria-label="Sair" data-tooltip="Sair" hidden>
+          <i data-lucide="log-out" aria-hidden="true"></i>
         </button>
         <button class="icon-button icon-button--primary" id="new-task" type="button" aria-label="Nova tarefa" data-tooltip="Nova tarefa">
           <i data-lucide="plus" aria-hidden="true"></i>
@@ -120,11 +136,11 @@
             <label for="ai-prompt">Criar com IA</label>
             <div class="ai-row">
               <textarea id="ai-prompt" rows="2" placeholder="Ex.: segunda às 16h, verificar com o PayPal a análise dos documentos da LANDR"></textarea>
-              <button class="icon-button" id="ai-submit" type="button" aria-label="Interpretar descrição" data-tooltip="Interpretar com IA" disabled>
+              <button class="icon-button" id="ai-submit" type="button" aria-label="Interpretar descrição" data-tooltip="Interpretar com IA">
                 <i data-lucide="sparkles" aria-hidden="true"></i>
               </button>
             </div>
-            <p>A integração será ativada junto com o Apps Script.</p>
+            <p id="ai-help">Descreva a tarefa em linguagem natural e revise os campos antes de salvar.</p>
           </section>
 
           <label class="field field--title">Tarefa
@@ -226,6 +242,8 @@
       </button>
     </fieldset>
   </template>
+
+  <div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <script src="app.js"></script>

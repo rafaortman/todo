@@ -2,6 +2,12 @@
 
 Beta de um gerenciador pessoal de tarefas, desenvolvido com HTML, CSS e JavaScript puro.
 
+## Demonstração pública
+
+https://rafaortman.github.io/todo/
+
+A demonstração usa `localStorage`: os dados ficam somente no navegador e não devem ser usados para informações sensíveis.
+
 ## Estado atual
 
 - tarefas em cards com cores configuráveis;
@@ -11,13 +17,42 @@ Beta de um gerenciador pessoal de tarefas, desenvolvido com HTML, CSS e JavaScri
 - interlocutores e links relacionados;
 - conclusão e reabertura;
 - tema claro/escuro;
-- persistência local no navegador.
+- persistência local no navegador na demonstração;
+- backend privado em Google Apps Script;
+- autenticação por senha com sessão temporária;
+- Google Sheets como banco de dados;
+- sincronização de tarefas agendadas com o Google Agenda;
+- criação assistida de tarefas pela OpenAI Responses API.
 
-## Próximas etapas
+## Arquitetura privada
 
-- usar Google Sheets como fonte de dados por meio do Apps Script;
-- criar e atualizar eventos no Google Agenda;
-- proteger o acesso no backend;
-- integrar a criação de tarefas por IA.
+O código do Apps Script fica em `apps-script/`. A versão privada é servida pelo próprio Apps Script, o que mantém senha, chave da OpenAI e permissões do Google fora do front-end público.
 
-Abra `index.html` em um navegador ou publique a raiz do repositório no GitHub Pages.
+Propriedades obrigatórias do projeto:
+
+- `APP_PASSWORD`: senha do painel;
+- `OPENAI_API_KEY`: chave da API da OpenAI;
+- `OPENAI_MODEL`: modelo habilitado na conta e compatível com Structured Outputs.
+
+Propriedades opcionais:
+
+- `CALENDAR_ID`: ID do calendário; omita ou use `primary` para o calendário principal;
+- `DEFAULT_EVENT_MINUTES`: duração padrão dos eventos, em minutos; o padrão é 60.
+
+Depois de alterar `index.html`, `styles.css` ou `app.js`, execute:
+
+```bash
+node scripts/build-apps-script.mjs
+```
+
+Isso atualiza `Index.html`, `Styles.html` e `App.html` dentro de `apps-script/`.
+
+O Apps Script deve ser publicado como aplicativo da web, executado pelo proprietário e acessível a qualquer pessoa. O acesso aos dados continua bloqueado pela senha e pelo token de sessão verificados no servidor.
+
+## Desenvolvimento local
+
+```bash
+python3 -m http.server 8000
+```
+
+Abra `http://localhost:8000`.
