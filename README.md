@@ -4,9 +4,9 @@ Beta de um gerenciador pessoal de tarefas, desenvolvido com HTML, CSS e JavaScri
 
 ## Demonstração pública
 
-https://rafaortman.github.io/todo/
+https://rafaortman.github.io/todo/?demo=1
 
-A demonstração usa `localStorage`: os dados ficam somente no navegador e não devem ser usados para informações sensíveis.
+O parâmetro `demo=1` ativa dados fictícios isolados no navegador, restauração do estado inicial e uma simulação local do fluxo de criação por IA. Esse modo nunca acessa Sheets, Agenda ou a API da OpenAI.
 
 ## Estado atual
 

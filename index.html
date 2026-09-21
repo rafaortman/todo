@@ -25,9 +25,15 @@
 
   <div class="app" id="app">
     <header class="app-header">
-      <button class="brand" id="home-button" type="button" aria-label="Voltar para tarefas">ToDo</button>
+      <div class="brand-group">
+        <button class="brand" id="home-button" type="button" aria-label="Voltar para tarefas">ToDo</button>
+        <span class="demo-badge" id="demo-badge" hidden>Demo</span>
+      </div>
       <div class="header-actions">
         <span class="connection-state" id="connection-state" hidden aria-live="polite"></span>
+        <button class="icon-button" id="demo-reset" type="button" aria-label="Restaurar demonstração" data-tooltip="Restaurar demo" hidden>
+          <i data-lucide="rotate-ccw" aria-hidden="true"></i>
+        </button>
         <button class="icon-button" id="theme-toggle" type="button" aria-label="Alternar tema" data-tooltip="Claro / escuro">
           <i data-lucide="moon" aria-hidden="true"></i>
         </button>
