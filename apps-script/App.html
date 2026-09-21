@@ -1,23 +1,25 @@
 <script>
-const STORAGE_KEY = 'todo-beta-tasks';
 const THEME_KEY = 'todo-beta-theme';
 const SESSION_KEY = 'todo-beta-session';
-const REMOTE_MODE = Boolean(window.google?.script?.run);
+const REMOTE_MODE = window.__TODO_REMOTE__ === true || Boolean(window.google?.script?.run);
+const DEMO_MODE = !REMOTE_MODE && new URLSearchParams(window.location.search).get('demo') === '1';
+const STORAGE_KEY = DEMO_MODE ? 'todo-portfolio-demo-tasks-v1' : 'todo-beta-tasks';
 
-const sampleTasks = [
+function createSampleTasks() {
+  return [
   {
     id: crypto.randomUUID(),
-    title: 'Revisar o modelo do painel',
-    nextAction: 'Validar os campos e o fluxo dos cards',
+    title: 'Revisar o protótipo do painel',
+    nextAction: 'Validar os filtros e a hierarquia dos cards',
     status: 'Em andamento',
     priority: 'Alta',
-    schedule: '',
+    schedule: futureDateTime(1, 10),
     deadline: '',
-    link: '',
+    link: 'https://example.com/prototipo',
     dependency: '',
-    tags: ['produto', 'organização'],
+    tags: ['produto', 'UX'],
     color: 'blue',
-    contacts: [],
+    contacts: [{ name: 'Marina', email: 'marina@example.com', phone: '', whatsapp: '' }],
     order: 0,
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -25,23 +27,42 @@ const sampleTasks = [
   },
   {
     id: crypto.randomUUID(),
-    title: 'Retornar uma mensagem importante',
-    nextAction: 'Fazer o contato e registrar o retorno',
+    title: 'Confirmar conteúdo da apresentação',
+    nextAction: 'Enviar a última versão e registrar o retorno',
     status: 'Aguardando',
     priority: 'Média',
     schedule: '',
-    deadline: '',
+    deadline: futureDate(3),
     link: '',
-    dependency: 'Aguardando resposta',
-    tags: ['pessoal'],
+    dependency: 'Aguardando aprovação',
+    tags: ['portfólio', 'conteúdo'],
     color: 'sand',
-    contacts: [{ name: 'Interlocutor', email: '', phone: '', whatsapp: '' }],
+    contacts: [{ name: 'Carlos', email: '', phone: '', whatsapp: '5521999999999' }],
     order: 1,
     createdAt: Date.now() - 1000,
     updatedAt: Date.now() - 1000,
     completedAt: null
+  },
+  {
+    id: crypto.randomUUID(),
+    title: 'Planejar a próxima entrega',
+    nextAction: 'Quebrar o escopo em tarefas menores',
+    status: 'Fazer',
+    priority: 'Baixa',
+    schedule: '',
+    deadline: futureDate(7),
+    link: '',
+    dependency: '',
+    tags: ['planejamento'],
+    color: 'green',
+    contacts: [],
+    order: 2,
+    createdAt: Date.now() - 2000,
+    updatedAt: Date.now() - 2000,
+    completedAt: null
   }
-];
+  ];
+}
 
 const state = {
   tasks: REMOTE_MODE ? [] : loadTasks(),
@@ -60,7 +81,7 @@ const form = el('task-form');
 
 function loadTasks() {
   const saved = localStorage.getItem(STORAGE_KEY);
-  return saved ? JSON.parse(saved) : sampleTasks;
+  return saved ? JSON.parse(saved) : createSampleTasks();
 }
 
 function saveTasks() {
@@ -72,6 +93,8 @@ async function init() {
   setTheme(localStorage.getItem(THEME_KEY) || 'light');
   bindEvents();
   el('logout-button').hidden = !REMOTE_MODE;
+  el('demo-badge').hidden = !DEMO_MODE;
+  el('demo-reset').hidden = !DEMO_MODE;
   if (REMOTE_MODE) {
     el('app').hidden = true;
     el('connection-state').hidden = false;
@@ -79,8 +102,10 @@ async function init() {
     else showLogin();
   } else {
     el('auth-view').hidden = true;
-    el('ai-submit').disabled = true;
-    el('ai-help').textContent = 'A criação por IA estará disponível na versão privada do Apps Script.';
+    el('ai-submit').disabled = !DEMO_MODE;
+    el('ai-help').textContent = DEMO_MODE
+      ? 'Demonstração local: a interpretação abaixo é simulada e não envia dados para uma IA.'
+      : 'A criação por IA estará disponível na versão privada do Apps Script.';
     renderTasks();
   }
   lucide.createIcons({ attrs: { width: 17, height: 17, 'stroke-width': 1.8 } });
@@ -88,6 +113,7 @@ async function init() {
 
 function bindEvents() {
   el('theme-toggle').addEventListener('click', toggleTheme);
+  el('demo-reset').addEventListener('click', resetDemo);
   el('logout-button').addEventListener('click', handleLogout);
   el('auth-form').addEventListener('submit', handleLogin);
   el('new-task').addEventListener('click', () => openTask());
@@ -504,7 +530,7 @@ function showLogin() {
 }
 
 async function createWithAi() {
-  if (!REMOTE_MODE) return;
+  if (!REMOTE_MODE && !DEMO_MODE) return;
   const prompt = el('ai-prompt').value.trim();
   if (!prompt) {
     el('ai-prompt').focus();
@@ -514,16 +540,90 @@ async function createWithAi() {
   el('ai-submit').disabled = true;
   el('ai-help').textContent = 'Interpretando…';
   try {
-    const generated = await callServer('createTaskFromPrompt', state.token, prompt);
+    const generated = DEMO_MODE
+      ? simulateTaskFromPrompt(prompt)
+      : await callServer('createTaskFromPrompt', state.token, prompt);
     fillForm({ ...emptyTask(), ...generated, id: '' });
     el('ai-prompt').value = prompt;
-    el('ai-help').textContent = 'Campos preenchidos. Revise antes de salvar.';
+    el('ai-help').textContent = DEMO_MODE
+      ? 'Simulação concluída. Revise os campos antes de salvar.'
+      : 'Campos preenchidos. Revise antes de salvar.';
   } catch (error) {
     handleRemoteError(error);
     el('ai-help').textContent = 'Não foi possível interpretar. Tente reformular a descrição.';
   } finally {
     el('ai-submit').disabled = false;
   }
+}
+
+function resetDemo() {
+  if (!DEMO_MODE || !confirm('Restaurar as tarefas originais da demonstração?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  state.tasks = createSampleTasks();
+  state.showCompleted = false;
+  state.sort = 'manual';
+  document.querySelector('input[name="sort"][value="manual"]').checked = true;
+  el('search-input').value = '';
+  el('filter-status').value = '';
+  el('filter-priority').value = '';
+  el('filter-text').value = '';
+  syncCompletedButton();
+  showOverview();
+  notify('Demonstração restaurada.');
+}
+
+function simulateTaskFromPrompt(prompt) {
+  const normalized = normalize(prompt);
+  const hourMatch = normalized.match(/\b([01]?\d|2[0-3])h(?::?([0-5]\d))?\b/);
+  const weekdayNames = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+  let daysAhead = normalized.includes('amanha') ? 1 : normalized.includes('hoje') ? 0 : null;
+  if (daysAhead === null) {
+    const targetDay = weekdayNames.findIndex(day => normalized.includes(day));
+    if (targetDay >= 0) daysAhead = (targetDay - new Date().getDay() + 7) % 7 || 7;
+  }
+
+  const schedule = daysAhead !== null || hourMatch
+    ? futureDateTime(daysAhead || 0, Number(hourMatch?.[1] || 9), Number(hourMatch?.[2] || 0))
+    : '';
+  const compactTitle = prompt.split(/[,.!?]/)[0].trim().slice(0, 72) || 'Nova tarefa';
+
+  return {
+    title: compactTitle.charAt(0).toUpperCase() + compactTitle.slice(1),
+    nextAction: prompt,
+    status: 'Fazer',
+    priority: /urgente|importante|prioridade alta/.test(normalized) ? 'Alta' : 'Média',
+    schedule,
+    deadline: '',
+    link: prompt.match(/https?:\/\/\S+/i)?.[0] || '',
+    dependency: '',
+    tags: ['demo', 'IA simulada'],
+    color: 'lavender',
+    contacts: []
+  };
+}
+
+function futureDate(daysAhead) {
+  const date = new Date();
+  date.setDate(date.getDate() + daysAhead);
+  return localDateParts(date).slice(0, 3).join('-');
+}
+
+function futureDateTime(daysAhead, hour, minute = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + daysAhead);
+  date.setHours(hour, minute, 0, 0);
+  const [year, month, day, hours, minutes] = localDateParts(date);
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function localDateParts(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+    String(date.getHours()).padStart(2, '0'),
+    String(date.getMinutes()).padStart(2, '0')
+  ];
 }
 
 function callServer(method, ...args) {
