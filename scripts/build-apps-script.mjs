@@ -14,8 +14,11 @@ const [html, css, js] = await Promise.all([
 
 const index = html
   .replace('<head>', '<head>\n  <base target="_top">')
-  .replace('<link rel="stylesheet" href="styles.css">', "<?!= include('Styles'); ?>")
-  .replace('<script src="app.js"></script>', "<?!= include('App'); ?>");
+  .replace('<link rel="stylesheet" href="styles.css?v=demo-1">', "<?!= include('Styles'); ?>")
+  .replace(
+    '<script src="app.js?v=demo-1"></script>',
+    "<script>window.__TODO_REMOTE__ = true;</script>\n  <?!= include('App'); ?>"
+  );
 
 await Promise.all([
   writeFile(path.join(target, 'Index.html'), index),
